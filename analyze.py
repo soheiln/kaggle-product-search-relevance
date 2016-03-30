@@ -19,12 +19,28 @@ from sklearn.ensemble import RandomForestRegressor, BaggingRegressor
 from nltk.stem.snowball import SnowballStemmer
 
 
-full_data_file = "full_data.csv"
+# global variables
+full_data_file = "full_data"
 df_all = pd.DataFrame()
+num_train = 100
+stemmer = SnowballStemmer('english')
+
+
+# function definitions
+def str_stemmer(s):
+  global stemmer
+  return " ".join([stemmer.stem(word) for word in s.lower().split()])
+def num_common_words(str1, str2):
+  return sum(int(str2.find(word)>=0) for word in str1.split())
+def num_common_words_type(str1, str2, type): # returns number of common words of a specific POS
+  type_list1 = [x for (x,y) in nltk.pos_tag(nltk.word_tokenize(str1)) if y == type]
+  return sum(int(str2.find(word)>=0) for word in type_list1)
+
 def maybe_load_all_data(force=False):
+  global df_all
   if force or not os.path.exists(full_data_file):
     # read and pre-process input data
-    num_rows = 10; #todo: remove this part of code
+    num_rows = 200; #todo: remove this part of code
     print "Reading input files..."
     df_train = pd.read_csv('./input/train.csv', encoding="ISO-8859-1", nrows = num_rows)
     df_test = pd.read_csv('./input/test.csv', encoding="ISO-8859-1", nrows = num_rows)
@@ -79,25 +95,14 @@ def maybe_load_all_data(force=False):
 
     # stemming all text data
     print "Stemming text columns..."
-    stemmer = SnowballStemmer('english')
-    def str_stemmer(s):
-      return " ".join([stemmer.stem(word) for word in s.lower().split()])
-    def str_common_word(str1, str2):
-      return sum(int(str2.find(word)>=0) for word in str1.split())
-    def str_common_word_type(str1, str2, type): # returns number of common words of a specific POS
-      type_list1 = [x for (x,y) in nltk.pos_tag(nltk.word_tokenize(str1)) if y == type ]
-      return sum(int(str2.find(word)>=0) for word in type_list1)
-
-
     df_all['search_term'] = df_all['search_term'].map(lambda x:str_stemmer(x))
     df_all['product_title'] = df_all['product_title'].map(lambda x:str_stemmer(x))
     df_all['product_description'] = df_all['product_description'].map(lambda x:str_stemmer(x))
     df_all['product_attributes'] = df_all['product_attributes'].map(lambda x:str_stemmer(x.decode('utf-8')))
-    df_all.to_csv(full_data_file)
+    df_all.to_pickle(full_data_file)
   else:
     "Reading full data from file: " + full_data_file
-    df_all = pd.read_csv('./' + full_data_file)
-
+    df_all = pd.read_pickle('./' + full_data_file)
 
 
 maybe_load_all_data()
@@ -105,23 +110,23 @@ maybe_load_all_data()
 print "Add new input fields..."
 df_all['len_of_query'] = df_all['search_term'].map(lambda x:len(x.split())).astype(np.int64)
 df_all['product_info'] = df_all['search_term']+"\t"+df_all['product_title']+"\t"+df_all['product_description']+"\t"+df_all['product_attributes']
-df_all['num_word_in_title'] = df_all['product_info'].map(lambda x:str_common_word(x.split('\t')[0],x.split('\t')[1]))
-df_all['num_word_in_description'] = df_all['product_info'].map(lambda x:str_common_word(x.split('\t')[0],x.split('\t')[2]))
-df_all['num_word_in_attributes'] = df_all['product_info'].map(lambda x:str_common_word(x.split('\t')[0],x.split('\t')[3]))
+df_all['num_word_in_title'] = df_all['product_info'].map(lambda x:num_common_words(x.split('\t')[0],x.split('\t')[1]))
+df_all['num_word_in_description'] = df_all['product_info'].map(lambda x:num_common_words(x.split('\t')[0],x.split('\t')[2]))
+df_all['num_word_in_attributes'] = df_all['product_info'].map(lambda x:num_common_words(x.split('\t')[0],x.split('\t')[3]))
 
 print "adding JJ input fields..."
-df_all['num_JJ_word_in_title'] = df_all['product_info'].map(lambda x:str_common_word_type(x.split('\t')[0],x.split('\t')[1], "JJ"))
-df_all['num_JJ_word_in_description'] = df_all['product_info'].map(lambda x:str_common_word_type(x.split('\t')[0],x.split('\t')[2], "JJ"))
-df_all['num_JJ_word_in_attributes'] = df_all['product_info'].map(lambda x:str_common_word_type(x.split('\t')[0],x.split('\t')[3], "JJ"))
+df_all['num_JJ_word_in_title'] = df_all['product_info'].map(lambda x:num_common_words_type(x.split('\t')[0],x.split('\t')[1], "JJ"))
+df_all['num_JJ_word_in_description'] = df_all['product_info'].map(lambda x:num_common_words_type(x.split('\t')[0],x.split('\t')[2], "JJ"))
+df_all['num_JJ_word_in_attributes'] = df_all['product_info'].map(lambda x:num_common_words_type(x.split('\t')[0],x.split('\t')[3], "JJ"))
 
 print "adding NN input fields..."
-df_all['num_NN_word_in_title'] = df_all['product_info'].map(lambda x:str_common_word_type(x.split('\t')[0],x.split('\t')[1], "NN"))
-df_all['num_NN_word_in_description'] = df_all['product_info'].map(lambda x:str_common_word_type(x.split('\t')[0],x.split('\t')[2], "NN"))
-df_all['num_NN_word_in_attributes'] = df_all['product_info'].map(lambda x:str_common_word_type(x.split('\t')[0],x.split('\t')[3], "NN"))
+df_all['num_NN_word_in_title'] = df_all['product_info'].map(lambda x:num_common_words_type(x.split('\t')[0],x.split('\t')[1], "NN"))
+df_all['num_NN_word_in_description'] = df_all['product_info'].map(lambda x:num_common_words_type(x.split('\t')[0],x.split('\t')[2], "NN"))
+df_all['num_NN_word_in_attributes'] = df_all['product_info'].map(lambda x:num_common_words_type(x.split('\t')[0],x.split('\t')[3], "NN"))
 
 
 # Dropping unnecessary input fields
-print "df_all before dropping: {}".format(df_all.head(5))
+# print "df_all before dropping: {}".format(df_all.head(5)) 
 df_all = df_all.drop(['search_term','product_title','product_description','product_info', 'product_attributes'],axis=1)
 
 
@@ -143,18 +148,16 @@ df_test = df_all.iloc[num_train:]
 id_test = df_test['id']
 
 y_train = df_train['relevance'].values
-X_train = df_train.drop(['id','relevance'],axis=1).values
-X_test = df_test.drop(['id','relevance'],axis=1).values
+x_train = df_train.drop(['id','relevance'],axis=1).values
+x_test = df_test.drop(['id','relevance'],axis=1).values
 
 rf = RandomForestRegressor(n_estimators=15, max_depth=6, random_state=0)
 clf = BaggingRegressor(rf, n_estimators=45, max_samples=0.1, random_state=25)
 print "Learning train data.."
-clf.fit(X_train, y_train)
+clf.fit(x_train, y_train)
 print "Pridicting test data.."
-y_pred = clf.predict(X_test)
+y_pred = clf.predict(x_test)
 
 pd.DataFrame({"id": id_test, "relevance": y_pred}).to_csv('submission.csv',index=False)
-
-
 
 
