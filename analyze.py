@@ -21,6 +21,7 @@ from nltk.stem.snowball import SnowballStemmer
 
 # global variables
 full_data_file = "full_data"
+preprocessed_data_file = "preprocessed_data"
 df_all = pd.DataFrame()
 num_train = 74067
 num_test = 166693
@@ -108,33 +109,38 @@ def maybe_load_all_data(force=False):
     df_all = pd.read_pickle('./' + full_data_file)
 
 
+def maybe_preprocess_all_data(force=False):
+  global df_all, num_train, num_test
+  if force or not os.path.exists(full_data_file):
+    # Creating additional input fields
+    print "Add new input fields..."
+    df_all['len_of_query'] = df_all['search_term'].map(lambda x:len(x.split())).astype(np.int64)
+    df_all['product_info'] = df_all['search_term']+"\t"+df_all['product_title']+"\t"+df_all['product_description']+"\t"+df_all['product_attributes']
+    df_all['num_word_in_title'] = df_all['product_info'].map(lambda x:num_common_words(x.split('\t')[0],x.split('\t')[1]))
+    df_all['num_word_in_description'] = df_all['product_info'].map(lambda x:num_common_words(x.split('\t')[0],x.split('\t')[2]))
+    df_all['num_word_in_attributes'] = df_all['product_info'].map(lambda x:num_common_words(x.split('\t')[0],x.split('\t')[3]))
+
+    print "adding JJ input fields..."
+    df_all['num_JJ_word_in_title'] = df_all['product_info'].map(lambda x:num_common_words_type(x.split('\t')[0],x.split('\t')[1], "JJ"))
+    df_all['num_JJ_word_in_description'] = df_all['product_info'].map(lambda x:num_common_words_type(x.split('\t')[0],x.split('\t')[2], "JJ"))
+    df_all['num_JJ_word_in_attributes'] = df_all['product_info'].map(lambda x:num_common_words_type(x.split('\t')[0],x.split('\t')[3], "JJ"))
+
+    print "adding NN input fields..."
+    df_all['num_NN_word_in_title'] = df_all['product_info'].map(lambda x:num_common_words_type(x.split('\t')[0],x.split('\t')[1], "NN"))
+    df_all['num_NN_word_in_description'] = df_all['product_info'].map(lambda x:num_common_words_type(x.split('\t')[0],x.split('\t')[2], "NN"))
+    df_all['num_NN_word_in_attributes'] = df_all['product_info'].map(lambda x:num_common_words_type(x.split('\t')[0],x.split('\t')[3], "NN"))
+
+    # Dropping unnecessary input fields
+    # print "df_all before dropping: {}".format(df_all.head(5))
+    df_all = df_all.drop(['search_term','product_title','product_description','product_info', 'product_attributes'],axis=1)
+    df_all.to_pickle(preprocessed_data_file)
+  else:
+    "Reading preprocessed data from file: " + preprocessed_data_file
+    df_all = pd.read_pickle('./' + preprocessed_data_file)
+
+
 maybe_load_all_data()
-# Creating additional input fields
-print "Add new input fields..."
-df_all['len_of_query'] = df_all['search_term'].map(lambda x:len(x.split())).astype(np.int64)
-df_all['product_info'] = df_all['search_term']+"\t"+df_all['product_title']+"\t"+df_all['product_description']+"\t"+df_all['product_attributes']
-df_all['num_word_in_title'] = df_all['product_info'].map(lambda x:num_common_words(x.split('\t')[0],x.split('\t')[1]))
-df_all['num_word_in_description'] = df_all['product_info'].map(lambda x:num_common_words(x.split('\t')[0],x.split('\t')[2]))
-df_all['num_word_in_attributes'] = df_all['product_info'].map(lambda x:num_common_words(x.split('\t')[0],x.split('\t')[3]))
-
-print "adding JJ input fields..."
-df_all['num_JJ_word_in_title'] = df_all['product_info'].map(lambda x:num_common_words_type(x.split('\t')[0],x.split('\t')[1], "JJ"))
-df_all['num_JJ_word_in_description'] = df_all['product_info'].map(lambda x:num_common_words_type(x.split('\t')[0],x.split('\t')[2], "JJ"))
-df_all['num_JJ_word_in_attributes'] = df_all['product_info'].map(lambda x:num_common_words_type(x.split('\t')[0],x.split('\t')[3], "JJ"))
-
-print "adding NN input fields..."
-df_all['num_NN_word_in_title'] = df_all['product_info'].map(lambda x:num_common_words_type(x.split('\t')[0],x.split('\t')[1], "NN"))
-df_all['num_NN_word_in_description'] = df_all['product_info'].map(lambda x:num_common_words_type(x.split('\t')[0],x.split('\t')[2], "NN"))
-df_all['num_NN_word_in_attributes'] = df_all['product_info'].map(lambda x:num_common_words_type(x.split('\t')[0],x.split('\t')[3], "NN"))
-
-
-# Dropping unnecessary input fields
-# print "df_all before dropping: {}".format(df_all.head(5)) 
-df_all = df_all.drop(['search_term','product_title','product_description','product_info', 'product_attributes'],axis=1)
-
-
-
-
+maybe_preprocess_all_data()
 
 # randomly run split data into train and validation sets
 
