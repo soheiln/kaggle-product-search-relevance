@@ -22,7 +22,8 @@ from nltk.stem.snowball import SnowballStemmer
 # global variables
 full_data_file = "full_data"
 df_all = pd.DataFrame()
-num_train = 100
+num_train = 74067
+num_test = 166693
 stemmer = SnowballStemmer('english')
 
 
@@ -37,13 +38,13 @@ def num_common_words_type(str1, str2, type): # returns number of common words of
   return sum(int(str2.find(word)>=0) for word in type_list1)
 
 def maybe_load_all_data(force=False):
-  global df_all
+  global df_all, num_train, num_test
   if force or not os.path.exists(full_data_file):
     # read and pre-process input data
     num_rows = 200; #todo: remove this part of code
     print "Reading input files..."
-    df_train = pd.read_csv('./input/train.csv', encoding="ISO-8859-1", nrows = num_rows)
-    df_test = pd.read_csv('./input/test.csv', encoding="ISO-8859-1", nrows = num_rows)
+    df_train = pd.read_csv('./input/train.csv', encoding="ISO-8859-1")
+    df_test = pd.read_csv('./input/test.csv', encoding="ISO-8859-1")
     df_pro_desc = pd.read_csv('./input/product_descriptions.csv')
     df_attr = pd.read_csv('./input/attributes.csv')
 
@@ -51,9 +52,11 @@ def maybe_load_all_data(force=False):
 
     # print high-level stats about data
     num_train = df_train.shape[0]
+    num_test = df_test.shape[0]
     print "num_train: {}".format(num_train)
-    print "df_train: \n{}".format(df_train.head(5))
-    print "df_test: \n{}".format(df_test.head(5))
+    print "num_test: {}".format(num_test)
+    # print "df_train: \n{}".format(df_train.head(5))
+    # print "df_test: \n{}".format(df_test.head(5))
 
     # save data in pickle format for future processing
     # TODO:
@@ -62,7 +65,7 @@ def maybe_load_all_data(force=False):
     print "Pre-processing data:"
     print "Concatenating train and test data..."
     df_all = pd.concat((df_train, df_test), axis=0, ignore_index=True)
-    print "df_all after concat: \n{}".format(df_all.head(5))
+    # print "df_all after concat: \n{}".format(df_all.head(5))
 
 
     # pre-process attributes
