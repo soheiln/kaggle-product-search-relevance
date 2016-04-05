@@ -12,9 +12,10 @@ import pandas as pd
 import nltk
 import os
 from sklearn.tree import DecisionTreeRegressor
+from sklearn import svm
 from sklearn import metrics
 from sklearn import cross_validation
-from sklearn.grid_search import GridSearchCV
+from sklearn import grid_search
 from sklearn.ensemble import RandomForestRegressor, BaggingRegressor
 from nltk.stem.snowball import SnowballStemmer
 
@@ -151,13 +152,13 @@ x_train = df_train.drop(['id','relevance'],axis=1).values
 x_test = df_test.drop(['id','relevance'],axis=1).values
 
 # analyze SVM Regressor performance
-skf = cross_validation.StratifiedKFold(y_train, n_folds=10, shuffle=True, random_state=0)
+kf = cross_validation.KFold(num_train, n_folds=3, shuffle=True, random_state=0)
+skf = cross_validation.StratifiedKFold(y_train, n_folds=3, shuffle=True, random_state=0)
 param_grid = [
   {'C': [1, 10, 100, 1000], 'kernel': ['linear']},
   {'C': [1, 10, 100, 1000], 'gamma': [0.001, 0.0001], 'kernel': ['rbf']}]
-svr = svm.SVC()
-# kf = cross_validation.KFold(num_train, n_folds=10, shuffle=True, random_state=0)
-clf1 = grid_search.GridSearchCV(svr, parameters, cv=skf)
+svr = svm.SVR()
+clf1 = grid_search.GridSearchCV(svr, param_grid, cv=kf)
 print "Learning train data using SVM.."
 clf1.fit(x_train, y_train)
 print "SVM best score: {}".format(clf1.best_score_)
@@ -169,7 +170,7 @@ param_grid = {"criterion": ["gini", "entropy"],
   "min_samples_leaf": [1, 5, 10],
   "max_leaf_nodes": [None, 5, 10, 20]}
 dtr = DecisionTreeRegressor()
-clf2 = grid_search.GridSearchCV(dtr, param_grid, cv=skf)
+clf2 = grid_search.GridSearchCV(dtr, param_grid, cv=kf)
 print "Learning train data using DecisionTree.."
 clf2.fit(x_train, y_train)
 print "DecisionTree best score: {}".format(clf2.best_score_)
