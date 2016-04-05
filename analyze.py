@@ -13,7 +13,7 @@ import nltk
 import os
 from sklearn.tree import DecisionTreeRegressor
 from sklearn import metrics
-from sklearn.cross_validation import train_test_split
+from sklearn import cross_validation
 from sklearn.grid_search import GridSearchCV
 from sklearn.ensemble import RandomForestRegressor, BaggingRegressor
 from nltk.stem.snowball import SnowballStemmer
@@ -111,7 +111,7 @@ def maybe_load_all_data(force=False):
 
 def maybe_preprocess_all_data(force=False):
   global df_all, num_train, num_test
-  if force or not os.path.exists(full_data_file):
+  if force or not os.path.exists(preprocessed_data_file):
     # Creating additional input fields
     print "Add new input fields..."
     df_all['len_of_query'] = df_all['search_term'].map(lambda x:len(x.split())).astype(np.int64)
@@ -138,20 +138,10 @@ def maybe_preprocess_all_data(force=False):
     "Reading preprocessed data from file: " + preprocessed_data_file
     df_all = pd.read_pickle('./' + preprocessed_data_file)
 
-
-maybe_load_all_data()
+# maybe_load_all_data()
 maybe_preprocess_all_data()
 
 # randomly run split data into train and validation sets
-
-# try SVM and DT regressors
-
-# analyze performance
-
-# pick new regressor and optimize hyper parameters
-
-# create final report
-
 df_train = df_all.iloc[:num_train]
 df_test = df_all.iloc[num_train:]
 id_test = df_test['id']
@@ -160,13 +150,39 @@ y_train = df_train['relevance'].values
 x_train = df_train.drop(['id','relevance'],axis=1).values
 x_test = df_test.drop(['id','relevance'],axis=1).values
 
+# analyze SVM Regressor performance
+skf = cross_validation.StratifiedKFold(y_train, n_folds=10, shuffle=True, random_state=0)
+param_grid = [
+  {'C': [1, 10, 100, 1000], 'kernel': ['linear']},
+  {'C': [1, 10, 100, 1000], 'gamma': [0.001, 0.0001], 'kernel': ['rbf']}]
+svr = svm.SVC()
+# kf = cross_validation.KFold(num_train, n_folds=10, shuffle=True, random_state=0)
+clf1 = grid_search.GridSearchCV(svr, parameters, cv=skf)
+print "Learning train data using SVM.."
+clf1.fit(x_train, y_train)
+print "SVM best score: {}".format(clf1.best_score_)
+
+# analyze DecisionTree regressor performance
+param_grid = {"criterion": ["gini", "entropy"],
+  "min_samples_split": [2, 10, 20],
+  "max_depth": [None, 2, 5, 10],
+  "min_samples_leaf": [1, 5, 10],
+  "max_leaf_nodes": [None, 5, 10, 20]}
+dtr = DecisionTreeRegressor()
+clf2 = grid_search.GridSearchCV(dtr, param_grid, cv=skf)
+print "Learning train data using DecisionTree.."
+clf2.fit(x_train, y_train)
+print "DecisionTree best score: {}".format(clf2.best_score_)
+
+# analyze RandomForest regressor performance
 rf = RandomForestRegressor(n_estimators=15, max_depth=6, random_state=0)
-clf = BaggingRegressor(rf, n_estimators=45, max_samples=0.1, random_state=25)
-print "Learning train data.."
-clf.fit(x_train, y_train)
-print "Pridicting test data.."
-y_pred = clf.predict(x_test)
+clf3 = BaggingRegressor(rf, n_estimators=45, max_samples=0.1, random_state=25)
+print "Learning train data using RandomForestRegressor.."
+clf3.fit(x_train, y_train)
 
+# create final report
+y_pred = clf1.predict(x_test) # SVM prediction
+y_pred = clf2.predict(x_test) # DecitionTree prediction
+y_pred = clf3.predict(x_test) # RandomForest prediction
 pd.DataFrame({"id": id_test, "relevance": y_pred}).to_csv('submission.csv',index=False)
-
 
