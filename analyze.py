@@ -16,13 +16,17 @@ from sklearn import svm
 from sklearn import metrics
 from sklearn import cross_validation
 from sklearn import grid_search
+from sklearn.linear_model import LinearRegression
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.ensemble import AdaBoostRegressor
+from sklearn.metrics import mean_squared_error
 from sklearn.ensemble import RandomForestRegressor, BaggingRegressor
 from nltk.stem.snowball import SnowballStemmer
 
 
 # global variables
 full_data_file = "full_data"
-preprocessed_data_file = "preprocessed_data"
+preprocessed_data_file = "preprocessed_data.csv"
 df_all = pd.DataFrame()
 num_train = 74067
 num_test = 166693
@@ -43,7 +47,6 @@ def maybe_load_all_data(force=False):
   global df_all, num_train, num_test
   if force or not os.path.exists(full_data_file):
     # read and pre-process input data
-    num_rows = 200; #todo: remove this part of code
     print "Reading input files..."
     df_train = pd.read_csv('./input/train.csv', encoding="ISO-8859-1")
     df_test = pd.read_csv('./input/test.csv', encoding="ISO-8859-1")
@@ -59,9 +62,6 @@ def maybe_load_all_data(force=False):
     print "num_test: {}".format(num_test)
     # print "df_train: \n{}".format(df_train.head(5))
     # print "df_test: \n{}".format(df_test.head(5))
-
-    # save data in pickle format for future processing
-    # TODO:
 
     # pre-process input data
     print "Pre-processing data:"
@@ -137,7 +137,7 @@ def maybe_preprocess_all_data(force=False):
     df_all.to_pickle(preprocessed_data_file)
   else:
     "Reading preprocessed data from file: " + preprocessed_data_file
-    df_all = pd.read_pickle('./' + preprocessed_data_file)
+    df_all = pd.read_csv('./' + preprocessed_data_file)
 
 # maybe_load_all_data()
 maybe_preprocess_all_data()
@@ -151,39 +151,46 @@ y_train = df_train['relevance'].values
 x_train = df_train.drop(['id','relevance'],axis=1).values
 x_test = df_test.drop(['id','relevance'],axis=1).values
 
-# analyze SVM Regressor performance
-kf = cross_validation.KFold(num_train, n_folds=3, shuffle=True, random_state=0)
-skf = cross_validation.StratifiedKFold(y_train, n_folds=3, shuffle=True, random_state=0)
-param_grid = [
-  {'C': [1, 10, 100, 1000], 'kernel': ['linear']},
-  {'C': [1, 10, 100, 1000], 'gamma': [0.001, 0.0001], 'kernel': ['rbf']}]
-svr = svm.SVR()
-clf1 = grid_search.GridSearchCV(svr, param_grid, cv=kf)
-print "Learning train data using SVM.."
-clf1.fit(x_train, y_train)
-print "SVM best score: {}".format(clf1.best_score_)
+validation_set_ratio = 0.5
+x_t, x_v, y_t, y_v = cross_validation.train_test_split(x_train, y_train, test_size=validation_set_ratio, random_state=0)
+# kf = cross_validation.KFold(num_train, n_folds=3, shuffle=True, random_state=0)
+# skf = cross_validation.StratifiedKFold(y_train, n_folds=3, shuffle=True, random_state=0)
+
+# analyze Linear Regressor performance
+clf = LinearRegression()
+print "Learning train data using Linear Regressor.."
+clf.fit(x_t, y_t)
+print "LinearRegressor MSE score: {}".format(mean_squared_error(y_v, clf.predict(x_v)))
+
+# analyze KNN Regressor performance
+clf = KNeighborsRegressor()
+print "Learning train data using KNeighborsRegressor.."
+clf.fit(x_t, y_t)
+print "KNeighborsRegressor MSE score: {}".format(mean_squared_error(y_v, clf.predict(x_v)))
 
 # analyze DecisionTree regressor performance
-param_grid = {"criterion": ["gini", "entropy"],
-  "min_samples_split": [2, 10, 20],
-  "max_depth": [None, 2, 5, 10],
-  "min_samples_leaf": [1, 5, 10],
-  "max_leaf_nodes": [None, 5, 10, 20]}
-dtr = DecisionTreeRegressor()
-clf2 = grid_search.GridSearchCV(dtr, param_grid, cv=kf)
+clf = DecisionTreeRegressor()
 print "Learning train data using DecisionTree.."
-clf2.fit(x_train, y_train)
-print "DecisionTree best score: {}".format(clf2.best_score_)
+clf.fit(x_t, y_t)
+print "DecisionTree MSE: {}".format(mean_squared_error(y_v, clf.predict(x_v)))
+
+# analyze AdaBoostRegressor performance
+clf = AdaBoostRegressor()
+print "Learning train data using AdaBoostRegressor.."
+clf.fit(x_t, y_t)
+print "AdaBoostRegressor MSE: {}".format(mean_squared_error(y_v, clf.predict(x_v)))
 
 # analyze RandomForest regressor performance
 rf = RandomForestRegressor(n_estimators=15, max_depth=6, random_state=0)
-clf3 = BaggingRegressor(rf, n_estimators=45, max_samples=0.1, random_state=25)
+clf = BaggingRegressor(rf, n_estimators=45, max_samples=0.1, random_state=25)
 print "Learning train data using RandomForestRegressor.."
-clf3.fit(x_train, y_train)
+clf.fit(x_t, y_t)
+print "RandomForestRegressor score: {}".format(mean_squared_error(y_v, clf.predict(x_v)))
 
-# create final report
-y_pred = clf1.predict(x_test) # SVM prediction
-y_pred = clf2.predict(x_test) # DecitionTree prediction
-y_pred = clf3.predict(x_test) # RandomForest prediction
+# choose the best regressor and create final report
+rf = RandomForestRegressor(n_estimators=15, max_depth=6, random_state=0)
+clf = BaggingRegressor(rf, n_estimators=45, max_samples=0.1, random_state=25)
+clf.fit(x_train, y_train)
+y_pred = clf.predict(x_test)
 pd.DataFrame({"id": id_test, "relevance": y_pred}).to_csv('submission.csv',index=False)
 
