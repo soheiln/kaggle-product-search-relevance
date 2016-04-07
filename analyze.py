@@ -139,6 +139,15 @@ def maybe_preprocess_all_data(force=False):
     "Reading preprocessed data from file: " + preprocessed_data_file
     df_all = pd.read_csv('./' + preprocessed_data_file)
 
+# make sure output is in range 1-3
+def make_in_bounds(array):
+    output = np.asarray(array)
+    low_val = 1
+    high_val = 3
+    output[output < low_val] = low_val
+    output[output > high_val] = high_val
+    return output.tolist()
+
 # maybe_load_all_data()
 maybe_preprocess_all_data()
 
@@ -192,5 +201,5 @@ rf = RandomForestRegressor(n_estimators=15, max_depth=6, random_state=0)
 clf = BaggingRegressor(rf, n_estimators=45, max_samples=0.1, random_state=25)
 clf.fit(x_train, y_train)
 y_pred = clf.predict(x_test)
+y_pred = make_in_bounds(y_pred)
 pd.DataFrame({"id": id_test, "relevance": y_pred}).to_csv('submission.csv',index=False)
-
