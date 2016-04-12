@@ -4,13 +4,16 @@ The goal of this project is to learn from home depot product search relevance da
 create a model to predict/score the relevance of pairs of search queries and products
 to behave similar to human scorers
 """
-
+#-------------------------------
 # imports
+#-------------------------------
 import numpy as np
 import pylab as pl
 import pandas as pd
 import nltk
 import os
+import collections
+import matplotlib.pyplot as plt
 from sklearn.tree import DecisionTreeRegressor
 from sklearn import svm
 from sklearn import metrics
@@ -23,8 +26,9 @@ from sklearn.metrics import mean_squared_error
 from sklearn.ensemble import RandomForestRegressor, BaggingRegressor
 from nltk.stem.snowball import SnowballStemmer
 
-
+#-------------------------------
 # global variables
+#-------------------------------
 full_data_file = "full_data"
 preprocessed_data_file = "preprocessed_data.csv"
 df_all = pd.DataFrame()
@@ -33,7 +37,9 @@ num_test = 166693
 stemmer = SnowballStemmer('english')
 
 
+#-------------------------------
 # function definitions
+#-------------------------------
 def str_stemmer(s):
   global stemmer
   return " ".join([stemmer.stem(word) for word in s.lower().split()])
@@ -60,8 +66,6 @@ def maybe_load_all_data(force=False):
     num_test = df_test.shape[0]
     print "num_train: {}".format(num_train)
     print "num_test: {}".format(num_test)
-    # print "df_train: \n{}".format(df_train.head(5))
-    # print "df_test: \n{}".format(df_test.head(5))
 
     # pre-process input data
     print "Pre-processing data:"
@@ -148,6 +152,10 @@ def make_in_bounds(array):
     output[output > high_val] = high_val
     return output.tolist()
 
+#-------------------------------
+# Main Script
+#-------------------------------
+
 # maybe_load_all_data()
 maybe_preprocess_all_data()
 
@@ -157,13 +165,114 @@ df_test = df_all.iloc[num_train:]
 id_test = df_test['id']
 
 y_train = df_train['relevance'].values
-x_train = df_train.drop(['id','relevance'],axis=1).values
+x_train = df_train.drop(['id','relevance'],axis=1)
 x_test = df_test.drop(['id','relevance'],axis=1).values
 
 validation_set_ratio = 0.5
 x_t, x_v, y_t, y_v = cross_validation.train_test_split(x_train, y_train, test_size=validation_set_ratio, random_state=0)
 # kf = cross_validation.KFold(num_train, n_folds=3, shuffle=True, random_state=0)
 # skf = cross_validation.StratifiedKFold(y_train, n_folds=3, shuffle=True, random_state=0)
+
+#-------------------------------
+# exploratory data analysis
+#-------------------------------
+
+# stats on y_train
+print "Minimum y: {}".format(np.min(y_train))
+print "Maximum y: {}".format(np.max(y_train))
+print "Mean of y: {}".format(np.mean(y_train))
+print "STD of y: {}".format(np.std(y_train))
+
+y_train_distict = sorted(list(set(y_train)))
+print "Set of outputs: {}".format(collections.Counter(y_train))
+
+# stats on x_train
+print "Pre-processed dataset has shape: {}".format(x_train.shape)
+print x_train.head()
+print "\n\nInput correlation matrix: available in correlation_matrix.csv"
+
+print "\n\Mean for each input feature:"
+print x_train.mean()
+print "\n\nVariance for each input feature:"
+print x_train.std()
+
+# printing sorted list of correlated features
+corr = pd.DataFrame(x_train.corr())
+cols = np.array(corr.columns)
+n = corr.shape[0]
+list = []
+for i in range(n):
+    for j in range(i+1,n):
+        list.append( (corr.as_matrix()[i,j],cols[i]+ " & " + cols[j]) )
+for i,j in sorted(list):
+    print i,j
+
+# PCA analysis
+from sklearn.decomposition import PCA
+pca = PCA(n_components = 6)
+pca.fit(x_train)
+
+# Print the components and the amount of variance in the data contained in each dimension
+print "PCA Components:"
+print pca.components_
+
+print "\nPCA Explained Variance Ratio:"
+print pca.explained_variance_ratio_
+
+# Assigning a label (1, 2, 3) to train data and visualizing the labels
+def labeler(x):
+    if x <= 1.5:
+        return 1
+    if x < 2.5:
+        return 2
+    else:
+        return 3
+y_train_labels = map(labeler, y_train)
+
+# Mapping data to first two PCA's and visualizing output labels based on proximity to values 1, 2, or 3
+pca = PCA(n_components=2)
+X_r = pca.fit(x_train).transform(x_train)
+
+print np.min(X_r[:,0])
+print np.max(X_r[:,0])
+print np.min(X_r[:,1])
+print np.max(X_r[:,1])
+print np.mean(X_r[:,0])
+print np.mean(X_r[:,1])
+
+y = np.array(y_train_labels)
+target_names = [1,2,3]
+
+# plt.figure()
+
+# plt.subplot(3, 1, 1)
+# plt.scatter(X_r[y == 1, 0], X_r[y == 1, 1], c="r", label="Label 1", alpha = 0.2, s=1)
+# plt.legend()
+# plt.subplot(3, 1, 2)
+# plt.scatter(X_r[y == 2, 0], X_r[y == 2, 1], c="g", label="Label 2", alpha = 0.2, s=1)
+# plt.legend()
+# plt.subplot(3, 1, 3)
+# plt.scatter(X_r[y == 3, 0], X_r[y == 3, 1], c="b", label="Label 3", alpha = 0.2, s=1)
+# plt.legend()
+
+# # for c, i, target_name in zip("rgb", [1, 2, 3], target_names):
+# #     plt.scatter(X_r[y == i, 0], X_r[y == i, 1], c=c, label=target_name, alpha = 0.4, s=1)
+# # plt.legend()
+# plt.title('PCA of dataset')
+# plt.show()
+
+
+
+# print "\nThe figure below shows total explained variance of data over the number of PC's"
+# x = np.arange(6)
+# import matplotlib.pyplot as plt
+
+# print np.cumsum(pca.explained_variance_ratio_) #
+# plt.title('Total Explained Variance vs. Number of PC\'s')
+# plt.plot(x+1, np.cumsum(pca.explained_variance_ratio_), '-')
+# # plt.axis([1, 6, 0.0, 1.000])
+# plt.show()
+
 
 # analyze Linear Regressor performance
 clf = LinearRegression()
@@ -182,6 +291,13 @@ clf = DecisionTreeRegressor()
 print "Learning train data using DecisionTree.."
 clf.fit(x_t, y_t)
 print "DecisionTree MSE: {}".format(mean_squared_error(y_v, clf.predict(x_v)))
+
+# analyze PLS regressor performance
+from sklearn.cross_decomposition import PLSRegression
+clf = PLSRegression(n_components=2)
+print "Learning train data using PLSRegressor.."
+clf.fit(x_t, y_t)
+print "PLSRegressor MSE: {}".format(mean_squared_error(y_v, clf.predict(x_v)))
 
 # analyze AdaBoostRegressor performance
 clf = AdaBoostRegressor()
@@ -203,3 +319,5 @@ clf.fit(x_train, y_train)
 y_pred = clf.predict(x_test)
 y_pred = make_in_bounds(y_pred)
 pd.DataFrame({"id": id_test, "relevance": y_pred}).to_csv('submission.csv',index=False)
+
+
